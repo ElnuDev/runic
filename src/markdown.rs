@@ -124,20 +124,15 @@ impl Renderer {
 
     fn two_chr(&mut self, syntax_chr: char, tag: Tag) -> &mut Self {
         let mut in_syntax = false;
-        let mut potential_newline = false;
         let mut escaped = false;
         let mut potential_syntax = false;
         let mut start = 0;
         let mut end;
         for (i, chr) in self.unparsed_chars().iter() {
-            if *chr == '\n' {
-                if potential_newline {
-                    in_syntax = false;
-                    potential_syntax = false;
-                }
-                potential_newline = !potential_newline;
-            } else {
-                potential_newline = false;
+            if self.text[*i..].starts_with("\n\n") {
+                in_syntax = false;
+                potential_syntax = false;
+                continue;
             }
             if *chr != syntax_chr || start + 2 == *i {
                 if self.escape_chars.contains(i) {
@@ -186,18 +181,13 @@ impl Renderer {
 
     fn one_chr(&mut self, syntax_chr: char, tag: Tag) -> &mut Self {
         let mut in_syntax = false;
-        let mut potential_newline = false;
         let mut escaped = false;
         let mut start = 0;
         let mut end;
         for (i, chr) in self.unparsed_chars().iter() {
-            if *chr == '\n' {
-                if potential_newline {
-                    in_syntax = false;
-                }
-                potential_newline = !potential_newline;
-            } else {
-                potential_newline = false;
+            if self.text[*i..].starts_with("\n\n") {
+                in_syntax = false;
+                continue;
             }
             if *chr != syntax_chr || start + 1 == *i {
                 if self.escape_chars.contains(i) {
