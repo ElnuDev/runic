@@ -13,8 +13,8 @@ struct FormatSpan {
 
 #[derive(Clone, Copy, EnumIter)]
 pub enum Tag {
-    Italics,
-    Bold,
+    Emphasis,
+    Strong,
     Strikethrough,
     Code,
     Syntax,
@@ -23,8 +23,8 @@ pub enum Tag {
 impl Tag {
     fn to_string(&self) -> String {
         String::from(match self {
-            Self::Italics => "i",
-            Self::Bold => "b",
+            Self::Emphasis => "em",
+            Self::Strong => "strong",
             Self::Strikethrough => "s",
             Self::Code => "code",
             Self::Syntax => "syntax",
@@ -36,10 +36,10 @@ impl Tag {
         for tag in Self::iter() {
             let text_tag = Box::new(gtk::TextTag::new(Some(&tag.to_string())));
             match tag {
-                Self::Italics => {
+                Self::Emphasis => {
                     text_tag.set_property("style", pango::Style::Italic);
                 },
-                Self::Bold => {
+                Self::Strong => {
                     text_tag.set_property::<i32>("weight", 700);
                 },
                 Self::Strikethrough => {
@@ -82,8 +82,8 @@ impl Renderer {
 
     fn render(&mut self) {
         self
-            .bold()
-            .italics()
+            .strong()
+            .emphasis()
             .strikethrough()
             .code()
             .syntax();
@@ -135,10 +135,10 @@ impl Renderer {
         self
     }
 
-    fn bold(&mut self) -> &mut Self {
+    fn strong(&mut self) -> &mut Self {
         self
-            .two_chr('*', Tag::Bold)
-            .two_chr('_', Tag::Bold)
+            .two_chr('*', Tag::Strong)
+            .two_chr('_', Tag::Strong)
     }
 
     fn strikethrough(&mut self) -> &mut Self {
@@ -169,10 +169,10 @@ impl Renderer {
         self
     }
 
-    fn italics(&mut self) -> &mut Self {
+    fn emphasis(&mut self) -> &mut Self {
         self
-            .one_chr('*', Tag::Italics)
-            .one_chr('_', Tag::Italics)
+            .one_chr('*', Tag::Emphasis)
+            .one_chr('_', Tag::Emphasis)
     }
 
     fn code(&mut self) -> &mut Self {
