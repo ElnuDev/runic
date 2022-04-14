@@ -136,7 +136,9 @@ impl Renderer {
     }
 
     fn bold(&mut self) -> &mut Self {
-        self.two_chr('*', Tag::Bold)
+        self
+            .two_chr('*', Tag::Bold)
+            .two_chr('_', Tag::Bold)
     }
 
     fn strikethrough(&mut self) -> &mut Self {
@@ -168,7 +170,9 @@ impl Renderer {
     }
 
     fn italics(&mut self) -> &mut Self {
-        self.one_chr('*', Tag::Italics)
+        self
+            .one_chr('*', Tag::Italics)
+            .one_chr('_', Tag::Italics)
     }
 
     fn code(&mut self) -> &mut Self {
