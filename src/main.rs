@@ -1,5 +1,5 @@
-use gtk::prelude::*;
 use gtk::glib;
+use gtk::prelude::*;
 
 mod markdown;
 use markdown::{Renderer, Tag};
@@ -31,10 +31,7 @@ fn build_ui(application: &gtk::Application) {
 }
 
 fn main() {
-    let application = gtk::Application::new(
-        Some("com.github.ElnuDev.runic"),
-        Default::default()
-    );
+    let application = gtk::Application::new(Some("com.github.ElnuDev.runic"), Default::default());
 
     application.connect_activate(build_ui);
 
