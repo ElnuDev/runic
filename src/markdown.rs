@@ -107,7 +107,9 @@ impl Renderer {
     fn escape_chars(&mut self) -> &mut Self {
         let mut escaped = false;
         for (i, chr) in self.text.chars().enumerate() {
-            if escaped {
+            if chr == '\n' {
+                escaped = false;
+            } else if escaped {
                 self.escape_chars.push(i - 1);
                 if chr == '\\' {
                     self.parsed_chars.push(i - 1);
@@ -122,11 +124,21 @@ impl Renderer {
 
     fn two_chr(&mut self, syntax_chr: char, tag: Tag) -> &mut Self {
         let mut in_syntax = false;
+        let mut potential_newline = false;
         let mut escaped = false;
         let mut potential_syntax = false;
         let mut start = 0;
         let mut end;
         for (i, chr) in self.unparsed_chars().iter() {
+            if *chr == '\n' {
+                if potential_newline {
+                    in_syntax = false;
+                    potential_syntax = false;
+                }
+                potential_newline = !potential_newline;
+            } else {
+                potential_newline = false;
+            }
             if *chr != syntax_chr || start + 2 == *i {
                 if self.escape_chars.contains(i) {
                     escaped = true;
@@ -174,10 +186,19 @@ impl Renderer {
 
     fn one_chr(&mut self, syntax_chr: char, tag: Tag) -> &mut Self {
         let mut in_syntax = false;
+        let mut potential_newline = false;
         let mut escaped = false;
         let mut start = 0;
         let mut end;
         for (i, chr) in self.unparsed_chars().iter() {
+            if *chr == '\n' {
+                if potential_newline {
+                    in_syntax = false;
+                }
+                potential_newline = !potential_newline;
+            } else {
+                potential_newline = false;
+            }
             if *chr != syntax_chr || start + 1 == *i {
                 if self.escape_chars.contains(i) {
                     escaped = true;
