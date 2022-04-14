@@ -1,5 +1,6 @@
 use gtk::pango;
 use gtk::prelude::*;
+use gtk::gdk::RGBA;
 
 use std::ops::Range;
 use strum::EnumIter;
@@ -15,6 +16,7 @@ pub enum Tag {
     Italics,
     Bold,
     Strikethrough,
+    Syntax,
 }
 
 impl Tag {
@@ -23,6 +25,7 @@ impl Tag {
             Self::Italics => "i",
             Self::Bold => "b",
             Self::Strikethrough => "s",
+            Self::Syntax => "syntax",
         })
     }
 
@@ -39,8 +42,11 @@ impl Tag {
                 },
                 Self::Strikethrough => {
                     text_tag.set_property("strikethrough", true);
+                },
+                Self::Syntax => {
+                    text_tag.set_property("foreground-rgba", RGBA::new(0.5, 0.5, 0.5, 1.0));
                 }
-            }
+            };
             tag_table.add(&*text_tag);
         }
     }
@@ -73,7 +79,8 @@ impl Renderer {
         self
             .bold()
             .italics()
-            .strikethrough();
+            .strikethrough()
+            .syntax();
     }
 
     pub fn display(&mut self, buffer: &gtk::TextBuffer) {
@@ -106,11 +113,13 @@ impl Renderer {
                         range: start..end,
                         tag,
                     });
+                    self.parsed_chars.push(start);
+                    self.parsed_chars.push(start + 1);
+                    self.parsed_chars.push(end - 2);
+                    self.parsed_chars.push(end - 1);
                 } else {
                     start = *i - 1;
                 }
-                self.parsed_chars.push(*i - 1);
-                self.parsed_chars.push(*i);
                 potential_syntax = false;
                 in_syntax = !in_syntax;
             } else {
@@ -142,11 +151,22 @@ impl Renderer {
                     range: start..end,
                     tag: Tag::Italics,
                 });
+                self.parsed_chars.push(start);
+                self.parsed_chars.push(end);
             } else {
                 start = *i;
             }
-            self.parsed_chars.push(*i);
             in_italics = !in_italics;
+        }
+        self
+    }
+
+    fn syntax(&mut self) -> &mut Self {
+        for i in self.parsed_chars.iter() {
+            self.format_spans.push(FormatSpan {
+                range: *i..*i + 1,
+                tag: Tag::Syntax,
+            });
         }
         self
     }
