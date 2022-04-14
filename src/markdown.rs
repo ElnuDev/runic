@@ -34,6 +34,7 @@ impl Tag {
                 }
                 Self::Bold => {
                     text_tag.set_property::<i32>("weight", 700);
+                    text_tag.set_property("weight-set", true);
                 }
             }
             tag_table.add(&*text_tag);
@@ -70,6 +71,8 @@ impl Renderer {
 
     pub fn display(&mut self, buffer: &gtk::TextBuffer) {
         self.render();
+        let (start, end) = buffer.bounds();
+        buffer.remove_all_tags(&start, &end);
         for format_span in self.format_spans.iter() {
             buffer.apply_tag_by_name(
                 &format_span.tag.to_string(),
@@ -80,6 +83,33 @@ impl Renderer {
     }
 
     fn bold(&mut self) -> &mut Self {
+        let mut in_bold = false;
+        let mut potential_bold = false;
+        let mut start = 0;
+        let mut end;
+        for (i, chr) in self.unparsed_chars().iter() {
+            if *chr != '*' {
+                potential_bold = false;
+                continue;
+            }
+            if potential_bold {
+                if in_bold {
+                    end = *i + 1;
+                    self.format_spans.push(FormatSpan {
+                        range: start..end,
+                        tag: Tag::Bold,
+                    });
+                } else {
+                    start = *i - 1;
+                }
+                self.parsed_chars.push(*i - 1);
+                self.parsed_chars.push(*i);
+                potential_bold = false;
+                in_bold = !in_bold;
+            } else {
+                potential_bold = true;
+            }
+        }
         self
     }
 
