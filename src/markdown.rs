@@ -10,10 +10,11 @@ struct FormatSpan {
     tag: Tag,
 }
 
-#[derive(EnumIter)]
+#[derive(Clone, Copy, EnumIter)]
 pub enum Tag {
     Italics,
     Bold,
+    Strikethrough,
 }
 
 impl Tag {
@@ -21,6 +22,7 @@ impl Tag {
         String::from(match self {
             Self::Italics => "i",
             Self::Bold => "b",
+            Self::Strikethrough => "s",
         })
     }
 
@@ -31,10 +33,12 @@ impl Tag {
             match tag {
                 Self::Italics => {
                     text_tag.set_property("style", pango::Style::Italic);
-                }
+                },
                 Self::Bold => {
                     text_tag.set_property::<i32>("weight", 700);
-                    text_tag.set_property("weight-set", true);
+                },
+                Self::Strikethrough => {
+                    text_tag.set_property("strikethrough", true);
                 }
             }
             tag_table.add(&*text_tag);
@@ -66,7 +70,10 @@ impl Renderer {
     }
 
     fn render(&mut self) {
-        self.bold().italics();
+        self
+            .bold()
+            .italics()
+            .strikethrough();
     }
 
     pub fn display(&mut self, buffer: &gtk::TextBuffer) {
@@ -82,35 +89,43 @@ impl Renderer {
         }
     }
 
-    fn bold(&mut self) -> &mut Self {
-        let mut in_bold = false;
-        let mut potential_bold = false;
+    fn two_chr(&mut self, syntax_chr: char, tag: Tag) -> &mut Self {
+        let mut in_syntax = false;
+        let mut potential_syntax = false;
         let mut start = 0;
         let mut end;
         for (i, chr) in self.unparsed_chars().iter() {
-            if *chr != '*' {
-                potential_bold = false;
+            if *chr != syntax_chr {
+                potential_syntax = false;
                 continue;
             }
-            if potential_bold {
-                if in_bold {
+            if potential_syntax {
+                if in_syntax {
                     end = *i + 1;
                     self.format_spans.push(FormatSpan {
                         range: start..end,
-                        tag: Tag::Bold,
+                        tag,
                     });
                 } else {
                     start = *i - 1;
                 }
                 self.parsed_chars.push(*i - 1);
                 self.parsed_chars.push(*i);
-                potential_bold = false;
-                in_bold = !in_bold;
+                potential_syntax = false;
+                in_syntax = !in_syntax;
             } else {
-                potential_bold = true;
+                potential_syntax = true;
             }
         }
         self
+    }
+
+    fn bold(&mut self) -> &mut Self {
+        self.two_chr('*', Tag::Bold)
+    }
+
+    fn strikethrough(&mut self) -> &mut Self {
+        self.two_chr('~', Tag::Strikethrough)
     }
 
     fn italics(&mut self) -> &mut Self {
