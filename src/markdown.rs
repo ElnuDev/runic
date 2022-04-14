@@ -61,6 +61,7 @@ impl Tag {
 pub struct Renderer {
     format_spans: Vec<FormatSpan>,
     parsed_chars: Vec<usize>,
+    escape_chars: Vec<usize>,
     pub text: String,
 }
 
@@ -82,6 +83,7 @@ impl Renderer {
 
     fn render(&mut self) {
         self
+            .escape_chars()
             .strong()
             .emphasis()
             .strikethrough()
@@ -102,14 +104,39 @@ impl Renderer {
         }
     }
 
+    fn escape_chars(&mut self) -> &mut Self {
+        let mut escaped = false;
+        for (i, chr) in self.text.chars().enumerate() {
+            if escaped {
+                self.escape_chars.push(i - 1);
+                if chr == '\\' {
+                    self.parsed_chars.push(i - 1);
+                }
+                escaped = false;
+            } else if chr == '\\' {
+                escaped = true;
+            }
+        }
+        self
+    }
+
     fn two_chr(&mut self, syntax_chr: char, tag: Tag) -> &mut Self {
         let mut in_syntax = false;
+        let mut escaped = false;
         let mut potential_syntax = false;
         let mut start = 0;
         let mut end;
         for (i, chr) in self.unparsed_chars().iter() {
             if *chr != syntax_chr {
+                if self.escape_chars.contains(i) {
+                    escaped = true;
+                }
                 potential_syntax = false;
+                continue;
+            }
+            if escaped {
+                escaped = false;
+                self.parsed_chars.push(*i - 1);
                 continue;
             }
             if potential_syntax {
@@ -147,10 +174,19 @@ impl Renderer {
 
     fn one_chr(&mut self, syntax_chr: char, tag: Tag) -> &mut Self {
         let mut in_syntax = false;
+        let mut escaped = false;
         let mut start = 0;
         let mut end;
         for (i, chr) in self.unparsed_chars().iter() {
             if *chr != syntax_chr {
+                if self.escape_chars.contains(i) {
+                    escaped = true;
+                }
+                continue;
+            }
+            if escaped {
+                escaped = false;
+                self.parsed_chars.push(*i - 1);
                 continue;
             }
             if in_syntax {
