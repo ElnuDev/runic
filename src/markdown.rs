@@ -16,6 +16,7 @@ pub enum Tag {
     Italics,
     Bold,
     Strikethrough,
+    Code,
     Syntax,
 }
 
@@ -25,6 +26,7 @@ impl Tag {
             Self::Italics => "i",
             Self::Bold => "b",
             Self::Strikethrough => "s",
+            Self::Code => "code",
             Self::Syntax => "syntax",
         })
     }
@@ -43,6 +45,9 @@ impl Tag {
                 Self::Strikethrough => {
                     text_tag.set_property("strikethrough", true);
                 },
+                Self::Code => {
+                    text_tag.set_property("font", "Ubuntu Mono");
+                }
                 Self::Syntax => {
                     text_tag.set_property("foreground-rgba", RGBA::new(0.5, 0.5, 0.5, 1.0));
                 }
@@ -80,6 +85,7 @@ impl Renderer {
             .bold()
             .italics()
             .strikethrough()
+            .code()
             .syntax();
     }
 
@@ -137,28 +143,36 @@ impl Renderer {
         self.two_chr('~', Tag::Strikethrough)
     }
 
-    fn italics(&mut self) -> &mut Self {
-        let mut in_italics = false;
+    fn one_chr(&mut self, syntax_chr: char, tag: Tag) -> &mut Self {
+        let mut in_syntax = false;
         let mut start = 0;
         let mut end;
         for (i, chr) in self.unparsed_chars().iter() {
-            if *chr != '*' {
+            if *chr != syntax_chr {
                 continue;
             }
-            if in_italics {
-                end = *i;
+            if in_syntax {
+                end = *i + 1;
                 self.format_spans.push(FormatSpan {
                     range: start..end,
-                    tag: Tag::Italics,
+                    tag,
                 });
                 self.parsed_chars.push(start);
-                self.parsed_chars.push(end);
+                self.parsed_chars.push(*i);
             } else {
                 start = *i;
             }
-            in_italics = !in_italics;
+            in_syntax = !in_syntax;
         }
         self
+    }
+
+    fn italics(&mut self) -> &mut Self {
+        self.one_chr('*', Tag::Italics)
+    }
+
+    fn code(&mut self) -> &mut Self {
+        self.one_chr('`', Tag::Code)
     }
 
     fn syntax(&mut self) -> &mut Self {
