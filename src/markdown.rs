@@ -127,7 +127,7 @@ impl Renderer {
         let mut start = 0;
         let mut end;
         for (i, chr) in self.unparsed_chars().iter() {
-            if *chr != syntax_chr {
+            if *chr != syntax_chr || start + 2 == *i {
                 if self.escape_chars.contains(i) {
                     escaped = true;
                 }
@@ -178,7 +178,7 @@ impl Renderer {
         let mut start = 0;
         let mut end;
         for (i, chr) in self.unparsed_chars().iter() {
-            if *chr != syntax_chr {
+            if *chr != syntax_chr || start + 1 == *i {
                 if self.escape_chars.contains(i) {
                     escaped = true;
                 }
