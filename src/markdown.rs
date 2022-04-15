@@ -6,6 +6,8 @@ use std::ops::Range;
 use strum::EnumIter;
 use strum::IntoEnumIterator;
 
+use unicode_segmentation::UnicodeSegmentation;
+
 struct FormatSpan {
     range: Range<usize>,
     tag: Tag,
@@ -73,11 +75,12 @@ impl Renderer {
         }
     }
 
-    fn unparsed_chars(&self) -> Vec<(usize, char)> {
+    fn unparsed_chars(&self) -> Vec<(usize, String)> {
         self.text
-            .chars()
+            .graphemes(true)
             .enumerate()
             .filter(|&(i, _)| !self.parsed_chars.contains(&i))
+            .map(|(i, chr)| (i, String::from(chr)))
             .collect()
     }
 
@@ -122,48 +125,52 @@ impl Renderer {
         self
     }
 
-    fn two_chr(&mut self, syntax_chr: char, tag: Tag) -> &mut Self {
+    fn inline(&mut self, syntax: &str, tag: Tag) -> &mut Self {
         let mut in_syntax = false;
-        let mut escaped = false;
-        let mut potential_syntax = false;
         let mut start = 0;
         let mut end;
-        for (i, chr) in self.unparsed_chars().iter() {
-            if self.text[*i..].starts_with("\n\n") {
+        let len = syntax.len();
+        let unparsed_chars = self.unparsed_chars();
+        let mut unparsed_chars_iter = unparsed_chars.iter();
+        while unparsed_chars_iter.size_hint().0 > 0 {
+            let (i, _chr) = unparsed_chars_iter.next().unwrap();
+            let i = *i;
+            // https://stackoverflow.com/a/51983601
+            let next_text = &self.text[self.text.char_indices().map(|(i, _)| i).nth(i).unwrap()..];
+            // Double new line resets parsing,
+            // also skips next character (another new line)
+            if next_text.starts_with("\n\n") {
                 in_syntax = false;
-                potential_syntax = false;
+                unparsed_chars_iter.next();
                 continue;
             }
-            if *chr != syntax_chr || start + 2 == *i {
-                if self.escape_chars.contains(i) {
-                    escaped = true;
+            if next_text.starts_with(syntax) {
+                for _ in 0..len {
+                    unparsed_chars_iter.next();
                 }
-                potential_syntax = false;
-                continue;
-            }
-            if escaped {
-                escaped = false;
-                self.parsed_chars.push(*i - 1);
-                continue;
-            }
-            if potential_syntax {
                 if in_syntax {
-                    end = *i + 1;
+                    // If at syntax string not directly before another syntax string
+                    // (i.e. not **** but **a**)
+                    if start + len == i {
+                        continue;
+                    }
+                    end = i + len;
                     self.format_spans.push(FormatSpan {
                         range: start..end,
                         tag,
                     });
-                    self.parsed_chars.push(start);
-                    self.parsed_chars.push(start + 1);
-                    self.parsed_chars.push(end - 2);
-                    self.parsed_chars.push(end - 1);
+                    for i in 0..len {
+                        self.parsed_chars.push(start + i);
+                        self.parsed_chars.push(end - i - 1);
+                    }
                 } else {
-                    start = *i - 1;
+                    start = i;
                 }
-                potential_syntax = false;
                 in_syntax = !in_syntax;
-            } else {
-                potential_syntax = true;
+            } else if next_text.starts_with(&format!("\\{syntax}")) {
+                // Skip next character if escaped
+                self.parsed_chars.push(i);
+                unparsed_chars_iter.next();
             }
         }
         self
@@ -171,59 +178,22 @@ impl Renderer {
 
     fn strong(&mut self) -> &mut Self {
         self
-            .two_chr('*', Tag::Strong)
-            .two_chr('_', Tag::Strong)
+            .inline("**", Tag::Strong)
+            .inline("__", Tag::Strong)
     }
 
     fn strikethrough(&mut self) -> &mut Self {
-        self.two_chr('~', Tag::Strikethrough)
-    }
-
-    fn one_chr(&mut self, syntax_chr: char, tag: Tag) -> &mut Self {
-        let mut in_syntax = false;
-        let mut escaped = false;
-        let mut start = 0;
-        let mut end;
-        for (i, chr) in self.unparsed_chars().iter() {
-            if self.text[*i..].starts_with("\n\n") {
-                in_syntax = false;
-                continue;
-            }
-            if *chr != syntax_chr || start + 1 == *i {
-                if self.escape_chars.contains(i) {
-                    escaped = true;
-                }
-                continue;
-            }
-            if escaped {
-                escaped = false;
-                self.parsed_chars.push(*i - 1);
-                continue;
-            }
-            if in_syntax {
-                end = *i + 1;
-                self.format_spans.push(FormatSpan {
-                    range: start..end,
-                    tag,
-                });
-                self.parsed_chars.push(start);
-                self.parsed_chars.push(*i);
-            } else {
-                start = *i;
-            }
-            in_syntax = !in_syntax;
-        }
-        self
+        self.inline("~~", Tag::Strikethrough)
     }
 
     fn emphasis(&mut self) -> &mut Self {
         self
-            .one_chr('*', Tag::Emphasis)
-            .one_chr('_', Tag::Emphasis)
+            .inline("*", Tag::Emphasis)
+            .inline("_", Tag::Emphasis)
     }
 
     fn code(&mut self) -> &mut Self {
-        self.one_chr('`', Tag::Code)
+        self.inline("`", Tag::Code)
     }
 
     fn syntax(&mut self) -> &mut Self {
