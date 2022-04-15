@@ -49,10 +49,10 @@ impl Tag {
                 },
                 Self::Code => {
                     text_tag.set_property("font", "Ubuntu Mono");
-                }
+                },
                 Self::Syntax => {
                     text_tag.set_property("foreground-rgba", RGBA::new(0.5, 0.5, 0.5, 1.0));
-                }
+                },
             };
             tag_table.add(&*text_tag);
         }
@@ -64,24 +64,33 @@ pub struct Renderer {
     format_spans: Vec<FormatSpan>,
     parsed_chars: Vec<usize>,
     escape_chars: Vec<usize>,
+    update_range: Option<Range<usize>>,
     pub text: String,
 }
 
 impl Renderer {
-    pub fn from(text: &str) -> Self {
+    pub fn from(buffer: &gtk::TextBuffer) -> Self {
+        let (start, end) = buffer.bounds();
         Self {
-            text: String::from(text),
+            text: String::from(buffer.text(&start, &end, true).unwrap().as_str()),
             ..Default::default()
         }
     }
 
     fn unparsed_chars(&self) -> Vec<(usize, String)> {
-        self.text
+        let chars = self.text
             .graphemes(true)
             .enumerate()
+            .collect::<Vec<(usize, &str)>>();
+        let chars = match &self.update_range {
+            Some(update_range) => chars[update_range.clone().start..update_range.clone().end].into(),
+            None => chars
+        };
+        chars
+            .iter()
             .filter(|&(i, _)| !self.parsed_chars.contains(&i))
-            .map(|(i, chr)| (i, String::from(chr)))
-            .collect()
+            .map(|(i, chr)| (*i, String::from(*chr)))
+            .collect::<Vec<(usize, String)>>()
     }
 
     fn render(&mut self) {
@@ -94,10 +103,35 @@ impl Renderer {
             .syntax();
     }
 
-    pub fn display(&mut self, buffer: &gtk::TextBuffer) {
-        self.render();
-        let (start, end) = buffer.bounds();
+    // force_all should be true for example when loading a document the first time,
+    // when not only the single paragraph needs to be reformatted
+    pub fn display(&mut self, buffer: &gtk::TextBuffer, force_all: bool) {
+        let start;
+        let end;
+        if force_all {
+            (start, end) = buffer.bounds();
+        } else {
+            let unparsed_chars = self.unparsed_chars();
+            let mut update_range = 0..unparsed_chars.len();
+            for (i, _chr) in unparsed_chars[0..buffer.cursor_position() as usize].iter().rev() {
+                if self.text[self.text.char_indices().map(|(i, _)| i).nth(*i).unwrap()..].starts_with("\n\n") {
+                    update_range.start = *i + 1;
+                    break;
+                }
+            }
+            for (i, _chr) in unparsed_chars[buffer.cursor_position() as usize..].iter() {
+                if self.text[self.text.char_indices().map(|(i, _)| i).nth(*i).unwrap()..].starts_with("\n\n") {
+                    update_range.end = *i;
+                    break;
+                }
+            }
+            println!("{:?}", update_range);
+            start = buffer.iter_at_offset(update_range.start as i32);
+            end = buffer.iter_at_offset(update_range.end as i32);
+            self.update_range = Some(update_range);
+        }
         buffer.remove_all_tags(&start, &end);
+        self.render();
         for format_span in self.format_spans.iter() {
             buffer.apply_tag_by_name(
                 &format_span.tag.to_string(),

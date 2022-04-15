@@ -19,8 +19,7 @@ fn build_ui(application: &gtk::Application) {
     Tag::init_tags(&buffer);
 
     buffer.connect_changed(glib::clone!(@weak buffer => move |_| {
-        let (start, end) = buffer.bounds();
-        Renderer::from(buffer.text(&start, &end, true).unwrap().as_str()).display(&buffer);
+        Renderer::from(&buffer).display(&buffer, false);
     }));
 
     button.connect_clicked(move |_| {
